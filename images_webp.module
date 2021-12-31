@@ -1,0 +1,66 @@
+<?php
+
+function convertImageToWebP($source) {
+  if (!file_exists($source)){
+    return $source;
+  }
+  $ext = pathinfo($source, PATHINFO_EXTENSION);
+  $destination = str_replace('.'.$ext, '.wepb', $source);
+  ob_start();
+  switch ($ext){
+    case 'jpeg':
+    case 'jpg':
+      $image = imagecreatefromjpeg($source);
+      imagejpeg($image, NULL, 100);
+      break;
+    case 'gif':
+      $image = imagecreatefromgif($source);
+      imagegif($image);
+      break;
+    case 'png':
+      $image = imagecreatefrompng($source);
+      imagepng($image);
+      break;
+    default:
+      ob_end_clean();
+      return $source;
+      break;
+  }
+  $cont = ob_get_contents();
+  ob_end_clean();
+  imagedestroy($image);
+  if (!file_exists($destination)){
+    $content = imagecreatefromstring($cont);
+    imagewebp($content, $destination);
+    imagedestroy($content);
+  }
+  if (file_exists($destination)){
+    return $destination;
+  } else {
+    return $source;
+  }
+}
+
+function images_webp_preprocess_image(&$vars){
+  $cwd = getcwd();
+  $host = \Drupal::request()->getSchemeAndHttpHost();
+  $uri = $vars['uri'];
+  $file = str_replace($host, $cwd, $uri);
+
+  $param = explode('?', $file)[1];
+  $file = explode('?', $file)[0];
+
+  $updated_file = convertImageToWebP($file);
+  $updated_src = str_replace($cwd, $host, $updated_file);
+  if ($param){
+    $updated_src .= '?'.$param;
+  }
+  if (isset($vars['attributes']['data-src'])){
+    $vars['attributes']['data-src'] = $updated_src;
+  } else {
+    $vars['attributes']['src'] = $updated_src;
+  }
+  $vars['uri'] = $updated_src;
+}
+
+?>
